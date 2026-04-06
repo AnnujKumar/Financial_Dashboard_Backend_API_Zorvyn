@@ -1,0 +1,858 @@
+openapi: 3.1.0
+info:
+  title: Finance Dashboard Backend API
+  version: 1.0.0
+  description: |
+    Production-grade API documentation for the Finance Data Processing and Access Control backend.
+
+    This API provides:
+    - User registration, authentication, and role/status administration
+    - Financial record CRUD with filtering and pagination
+    - Dashboard summary analytics
+
+    Authentication:
+    - Protected endpoints require a Bearer JWT token in the Authorization header.
+
+    Roles:
+    - viewer: dashboard summary only
+    - analyst: dashboard summary + record read access
+    - admin: full access (records + user administration)
+servers:
+  - url: http://localhost:3000
+    description: Local development
+
+tags:
+  - name: Auth
+    description: Authentication and user management
+  - name: Records
+    description: Financial records CRUD and filtering
+  - name: Dashboard
+    description: Aggregated dashboard analytics
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    Role:
+      type: string
+      enum: [viewer, analyst, admin]
+
+    UserStatus:
+      type: string
+      enum: [active, inactive]
+
+    UserSummary:
+      type: object
+      required: [id, username, role, status]
+      properties:
+        id:
+          type: integer
+          example: 1
+        username:
+          type: string
+          example: finance_admin
+        role:
+          $ref: '#/components/schemas/Role'
+        status:
+          $ref: '#/components/schemas/UserStatus'
+
+    UserListItem:
+      allOf:
+        - $ref: '#/components/schemas/UserSummary'
+        - type: object
+          required: [created_at]
+          properties:
+            created_at:
+              type: string
+              format: date-time
+              example: 2026-04-06T09:42:13.000Z
+
+    RegisterRequest:
+      type: object
+      required: [username, password]
+      properties:
+        username:
+          type: string
+          minLength: 3
+          maxLength: 50
+          pattern: '^[a-zA-Z0-9_]+$'
+          description: Alphanumeric + underscore only.
+          example: analyst_user
+        password:
+          type: string
+          minLength: 8
+          maxLength: 72
+          description: Must include at least one letter and one number.
+          pattern: '^(?=.*[A-Za-z])(?=.*\d).+$'
+          example: Finance123
+        role:
+          $ref: '#/components/schemas/Role'
+
+    RegisterResponse:
+      type: object
+      required: [message, user]
+      properties:
+        message:
+          type: string
+          example: User registered successfully
+        user:
+          $ref: '#/components/schemas/UserSummary'
+
+    LoginRequest:
+      type: object
+      required: [username, password]
+      properties:
+        username:
+          type: string
+          minLength: 3
+          maxLength: 50
+          pattern: '^[a-zA-Z0-9_]+$'
+          example: analyst_user
+        password:
+          type: string
+          minLength: 1
+          maxLength: 72
+          example: Finance123
+
+    LoginResponse:
+      type: object
+      required: [message, token]
+      properties:
+        message:
+          type: string
+          example: Logged in successfully
+        token:
+          type: string
+          description: JWT access token
+          example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+
+    UpdateUserStatusRequest:
+      type: object
+      required: [status]
+      properties:
+        status:
+          $ref: '#/components/schemas/UserStatus'
+
+    UpdateUserStatusResponse:
+      type: object
+      required: [message, user]
+      properties:
+        message:
+          type: string
+          example: User status updated
+        user:
+          type: object
+          required: [id, username, status]
+          properties:
+            id:
+              type: integer
+              example: 2
+            username:
+              type: string
+              example: analyst_user
+            status:
+              $ref: '#/components/schemas/UserStatus'
+
+    UpdateUserRoleRequest:
+      type: object
+      required: [role]
+      properties:
+        role:
+          $ref: '#/components/schemas/Role'
+
+    UpdateUserRoleResponse:
+      type: object
+      required: [message, user]
+      properties:
+        message:
+          type: string
+          example: User role updated
+        user:
+          $ref: '#/components/schemas/UserSummary'
+
+    UserListResponse:
+      type: object
+      required: [data]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/UserListItem'
+
+    RecordInput:
+      type: object
+      required: [amount, type, category, date]
+      properties:
+        amount:
+          type: number
+          exclusiveMinimum: 0
+          multipleOf: 0.01
+          example: 1200.5
+        type:
+          type: string
+          enum: [income, expense]
+          example: income
+        category:
+          type: string
+          minLength: 2
+          maxLength: 50
+          pattern: '^[a-zA-Z0-9 _\-/&]+$'
+          example: Salary
+        date:
+          type: string
+          format: date
+          example: 2026-04-01
+        notes:
+          type: string
+          maxLength: 500
+          nullable: true
+          example: April salary payout
+
+    RecordItem:
+      type: object
+      required: [id, amount, type, category, date]
+      properties:
+        id:
+          type: integer
+          example: 10
+        amount:
+          oneOf:
+            - type: string
+            - type: number
+          description: Postgres numeric values may be returned as strings.
+          example: "1200.50"
+        type:
+          type: string
+          enum: [income, expense]
+          example: income
+        category:
+          type: string
+          example: Salary
+        date:
+          type: string
+          format: date
+          example: 2026-04-01
+        notes:
+          type: string
+          nullable: true
+          example: April salary payout
+        created_by:
+          type: integer
+          nullable: true
+          example: 1
+        created_at:
+          type: string
+          format: date-time
+          example: 2026-04-06T10:05:11.000Z
+
+    CreateRecordResponse:
+      type: object
+      required: [message, data]
+      properties:
+        message:
+          type: string
+          example: Record created
+        data:
+          $ref: '#/components/schemas/RecordItem'
+
+    UpdateRecordResponse:
+      type: object
+      required: [message, data]
+      properties:
+        message:
+          type: string
+          example: Record updated
+        data:
+          $ref: '#/components/schemas/RecordItem'
+
+    DeleteRecordResponse:
+      type: object
+      required: [message, id]
+      properties:
+        message:
+          type: string
+          example: Record deleted
+        id:
+          type: string
+          example: "10"
+
+    RecordsListResponse:
+      type: object
+      required: [data, limit, offset]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/RecordItem'
+        limit:
+          type: integer
+          example: 50
+        offset:
+          type: integer
+          example: 0
+
+    DashboardTotals:
+      type: object
+      required: [income, expenses, netBalance]
+      properties:
+        income:
+          type: number
+          example: 6500.75
+        expenses:
+          type: number
+          example: 2430.15
+        netBalance:
+          type: number
+          example: 4070.6
+
+    DashboardCategoryItem:
+      type: object
+      required: [category, type, total]
+      properties:
+        category:
+          type: string
+          example: Groceries
+        type:
+          type: string
+          enum: [income, expense]
+          example: expense
+        total:
+          oneOf:
+            - type: string
+            - type: number
+          example: "340.40"
+
+    DashboardRecentActivityItem:
+      type: object
+      required: [id, amount, type, category, date]
+      properties:
+        id:
+          type: integer
+          example: 8
+        amount:
+          oneOf:
+            - type: string
+            - type: number
+          example: "79.99"
+        type:
+          type: string
+          enum: [income, expense]
+        category:
+          type: string
+          example: Groceries
+        date:
+          type: string
+          format: date
+          example: 2026-04-05
+        notes:
+          type: string
+          nullable: true
+          example: Weekly supermarket
+
+    DashboardMonthlyTrendItem:
+      type: object
+      required: [month, income, expenses]
+      properties:
+        month:
+          type: string
+          format: date
+          example: 2026-04-01
+        income:
+          oneOf:
+            - type: string
+            - type: number
+          example: "6000.00"
+        expenses:
+          oneOf:
+            - type: string
+            - type: number
+          example: "2100.00"
+
+    DashboardSummaryResponse:
+      type: object
+      required: [totals, categories, recentActivity, monthlyTrends]
+      properties:
+        totals:
+          $ref: '#/components/schemas/DashboardTotals'
+        categories:
+          type: array
+          items:
+            $ref: '#/components/schemas/DashboardCategoryItem'
+        recentActivity:
+          type: array
+          items:
+            $ref: '#/components/schemas/DashboardRecentActivityItem'
+        monthlyTrends:
+          type: array
+          items:
+            $ref: '#/components/schemas/DashboardMonthlyTrendItem'
+
+    ValidationError:
+      type: object
+      required: [error, details]
+      properties:
+        error:
+          type: string
+          example: Validation failed
+        details:
+          type: array
+          items:
+            type: string
+          example:
+            - '"password" length must be at least 8 characters long'
+
+    BasicError:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string
+          example: Invalid credentials
+
+    ServerError:
+      type: object
+      required: [success, error]
+      properties:
+        success:
+          type: boolean
+          example: false
+        error:
+          type: string
+          example: Internal Server Error
+
+  responses:
+    BadRequestValidation:
+      description: Invalid request payload/query/params
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ValidationError'
+    Unauthorized:
+      description: Missing or invalid authentication
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/BasicError'
+          examples:
+            noToken:
+              value:
+                error: Access denied. No token provided.
+            invalidToken:
+              value:
+                error: Invalid token.
+    Forbidden:
+      description: Authenticated but not allowed due to role/status
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/BasicError'
+          examples:
+            inactive:
+              value:
+                error: User is inactive. Access forbidden.
+            role:
+              value:
+                error: Forbidden. You do not have permission to perform this action.
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/BasicError'
+    InternalServerError:
+      description: Unexpected server error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ServerError'
+
+paths:
+  /api/auth/register:
+    post:
+      tags: [Auth]
+      summary: Register user
+      description: Creates a new user account.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+            examples:
+              registerViewer:
+                value:
+                  username: viewer_01
+                  password: Finance123
+                  role: viewer
+      responses:
+        '201':
+          description: User created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RegisterResponse'
+        '400':
+          description: Validation error or duplicate username
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/ValidationError'
+                  - $ref: '#/components/schemas/BasicError'
+              examples:
+                duplicate:
+                  value:
+                    error: Username already exists
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/auth/login:
+    post:
+      tags: [Auth]
+      summary: Login user
+      description: Authenticates user and returns JWT access token.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+            examples:
+              login:
+                value:
+                  username: viewer_01
+                  password: Finance123
+      responses:
+        '200':
+          description: Authentication success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+        '400':
+          description: Validation or invalid credentials
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/ValidationError'
+                  - $ref: '#/components/schemas/BasicError'
+              examples:
+                invalidCreds:
+                  value:
+                    error: Invalid credentials
+        '403':
+          description: Account inactive
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BasicError'
+              example:
+                error: Account is inactive
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/auth/users:
+    get:
+      tags: [Auth]
+      summary: List users
+      description: Returns all users for administration.
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Users list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/auth/users/{id}/status:
+    patch:
+      tags: [Auth]
+      summary: Update user status
+      description: Admin endpoint to activate/deactivate another user.
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateUserStatusRequest'
+            examples:
+              deactivate:
+                value:
+                  status: inactive
+      responses:
+        '200':
+          description: Status updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UpdateUserStatusResponse'
+        '400':
+          description: Validation or business-rule failure
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/ValidationError'
+                  - $ref: '#/components/schemas/BasicError'
+              examples:
+                selfDeactivate:
+                  value:
+                    error: You cannot deactivate your own account.
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/auth/users/{id}/role:
+    patch:
+      tags: [Auth]
+      summary: Update user role
+      description: Admin endpoint to change user role.
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateUserRoleRequest'
+            examples:
+              promote:
+                value:
+                  role: analyst
+      responses:
+        '200':
+          description: Role updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UpdateUserRoleResponse'
+        '400':
+          description: Validation or business-rule failure
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/ValidationError'
+                  - $ref: '#/components/schemas/BasicError'
+              examples:
+                selfDemote:
+                  value:
+                    error: You cannot remove your own admin role.
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/records:
+    get:
+      tags: [Records]
+      summary: List records
+      description: Returns records with optional filtering and pagination.
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: type
+          schema:
+            type: string
+            enum: [income, expense]
+        - in: query
+          name: category
+          schema:
+            type: string
+            maxLength: 50
+            pattern: '^[a-zA-Z0-9 _\-/&]+$'
+        - in: query
+          name: startDate
+          schema:
+            type: string
+            format: date
+        - in: query
+          name: endDate
+          schema:
+            type: string
+            format: date
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 50
+        - in: query
+          name: offset
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+      responses:
+        '200':
+          description: Records list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RecordsListResponse'
+        '400':
+          $ref: '#/components/responses/BadRequestValidation'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+    post:
+      tags: [Records]
+      summary: Create record
+      description: Admin-only endpoint to create a financial record.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RecordInput'
+      responses:
+        '201':
+          description: Record created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreateRecordResponse'
+        '400':
+          $ref: '#/components/responses/BadRequestValidation'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/records/{id}:
+    put:
+      tags: [Records]
+      summary: Update record
+      description: Admin-only endpoint to update an existing record.
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RecordInput'
+      responses:
+        '200':
+          description: Record updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UpdateRecordResponse'
+        '400':
+          $ref: '#/components/responses/BadRequestValidation'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+    delete:
+      tags: [Records]
+      summary: Delete record
+      description: Admin-only endpoint to delete a record by id.
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+      responses:
+        '200':
+          description: Record deleted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeleteRecordResponse'
+        '400':
+          $ref: '#/components/responses/BadRequestValidation'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/dashboard/summary:
+    get:
+      tags: [Dashboard]
+      summary: Get dashboard summary
+      description: Returns totals, category aggregation, recent activity, and monthly trends.
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Summary data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DashboardSummaryResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
