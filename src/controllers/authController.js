@@ -1,8 +1,6 @@
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const db = require('../config/db');
-const path = require('path');
-require('dotenv').config({ path: path.resolve(__dirname, '../../.env') });
 
 exports.register = async (req, res, next) => {
     try {
