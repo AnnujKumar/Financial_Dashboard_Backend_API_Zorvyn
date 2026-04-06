@@ -5,11 +5,7 @@ require('dotenv').config({
   override: false
 });
 
-const rawConnectionString = (process.env.DATABASE_URL || '').trim().replace(/^['"]|['"]$/g, '');
-
-if (!rawConnectionString) {
-  throw new Error('DATABASE_URL is missing. Set it in project root .env');
-}
+let pool = null;
 
 function resolveSslOption(connectionString) {
   const sslMode = (process.env.DATABASE_SSL || 'auto').toLowerCase();
@@ -34,12 +30,23 @@ function resolveSslOption(connectionString) {
   return false;
 }
 
-const pool = new Pool({
-  connectionString: rawConnectionString,
-  ssl: resolveSslOption(rawConnectionString)
-});
+function getPool() {
+  if (!pool) {
+    const rawConnectionString = (process.env.DATABASE_URL || '').trim().replace(/^['"]|['"]$/g, '');
+
+    if (!rawConnectionString) {
+      throw new Error('DATABASE_URL is missing. Set it in your Render environment variables or project root .env');
+    }
+
+    pool = new Pool({
+      connectionString: rawConnectionString,
+      ssl: resolveSslOption(rawConnectionString)
+    });
+  }
+  return pool;
+}
 
 module.exports = {
-  query: (text, params) => pool.query(text, params),
-  pool
+  query: (text, params) => getPool().query(text, params),
+  getPool: getPool
 };
