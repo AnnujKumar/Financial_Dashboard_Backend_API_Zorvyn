@@ -1,7 +1,13 @@
 import axios from 'axios';
 
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
+
+if (!API_BASE_URL) {
+  throw new Error('VITE_API_BASE_URL is not configured');
+}
+
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/api',
+  baseURL: API_BASE_URL,
 });
 
 api.interceptors.request.use((config) => {
